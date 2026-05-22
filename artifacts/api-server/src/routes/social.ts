@@ -10,7 +10,7 @@ import {
   bidsTable,
 } from "@workspace/db";
 import { eq, desc, and, sql, avg } from "drizzle-orm";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const router: IRouter = Router();
 
@@ -20,7 +20,7 @@ router.get("/users/:userId/reviews", async (req: Request, res: Response) => {
   const reviews = await db
     .select()
     .from(reviewsTable)
-    .where(eq(reviewsTable.revieweeId, req.params.userId))
+    .where(eq(reviewsTable.revieweeId, String(req.params.userId)))
     .orderBy(desc(reviewsTable.createdAt));
   res.json(reviews);
 });
@@ -66,7 +66,7 @@ router.patch("/reviews/:reviewId/reply", async (req: Request, res: Response) => 
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const reviewId = parseInt(req.params.reviewId);
+  const reviewId = parseInt(String(req.params.reviewId));
   if (isNaN(reviewId)) {
     res.status(400).json({ error: "Invalid reviewId" });
     return;
@@ -125,7 +125,7 @@ router.patch("/notifications/:notificationId/read", async (req: Request, res: Re
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const id = parseInt(req.params.notificationId);
+  const id = parseInt(String(req.params.notificationId));
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;

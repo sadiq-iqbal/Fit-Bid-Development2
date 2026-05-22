@@ -9,7 +9,7 @@ import {
   reviewsTable,
 } from "@workspace/db";
 import { eq, sql, and } from "drizzle-orm";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const router: IRouter = Router();
 
@@ -51,7 +51,7 @@ router.patch("/admin/verifications/:userId", async (req: Request, res: Response)
   const [updated] = await db
     .update(professionalProfilesTable)
     .set({ verificationStatus: parsed.data.status, updatedAt: new Date() })
-    .where(eq(professionalProfilesTable.userId, req.params.userId))
+    .where(eq(professionalProfilesTable.userId, String(req.params.userId)))
     .returning();
 
   if (!updated) {

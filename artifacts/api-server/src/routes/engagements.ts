@@ -15,7 +15,7 @@ import {
   usersTable,
 } from "@workspace/db";
 import { eq, and, or, desc, asc } from "drizzle-orm";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const router: IRouter = Router();
 
@@ -65,7 +65,7 @@ router.get("/engagements", async (req: Request, res: Response) => {
 // GET /api/engagements/:engagementId
 router.get("/engagements/:engagementId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -75,7 +75,7 @@ router.get("/engagements/:engagementId", async (req: Request, res: Response) => 
 // PATCH /api/engagements/:engagementId
 router.patch("/engagements/:engagementId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -85,9 +85,10 @@ router.patch("/engagements/:engagementId", async (req: Request, res: Response) =
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid body" }); return; }
+  const { endDate, ...rest } = parsed.data;
   const [updated] = await db
     .update(engagementsTable)
-    .set({ ...parsed.data, ...(parsed.data.endDate ? { endDate: new Date(parsed.data.endDate) } : {}) })
+    .set({ ...rest, ...(endDate ? { endDate: new Date(endDate) } : {}) })
     .where(eq(engagementsTable.id, id))
     .returning();
   res.json(updated);
@@ -96,7 +97,7 @@ router.patch("/engagements/:engagementId", async (req: Request, res: Response) =
 // GET /api/engagements/:engagementId/overview
 router.get("/engagements/:engagementId/overview", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -130,7 +131,7 @@ router.get("/engagements/:engagementId/overview", async (req: Request, res: Resp
 
 router.get("/engagements/:engagementId/workout-plans", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -140,7 +141,7 @@ router.get("/engagements/:engagementId/workout-plans", async (req: Request, res:
 
 router.post("/engagements/:engagementId/workout-plans", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -153,7 +154,7 @@ router.post("/engagements/:engagementId/workout-plans", async (req: Request, res
 
 router.get("/workout-plans/:planId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const planId = parseInt(req.params.planId);
+  const planId = parseInt(String(req.params.planId));
   if (isNaN(planId)) { res.status(400).json({ error: "Invalid planId" }); return; }
   const [plan] = await db.select().from(workoutPlansTable).where(eq(workoutPlansTable.id, planId));
   if (!plan) { res.status(404).json({ error: "Not found" }); return; }
@@ -169,7 +170,7 @@ router.get("/workout-plans/:planId", async (req: Request, res: Response) => {
 
 router.patch("/workout-plans/:planId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const planId = parseInt(req.params.planId);
+  const planId = parseInt(String(req.params.planId));
   if (isNaN(planId)) { res.status(400).json({ error: "Invalid planId" }); return; }
   const schema = z.object({ weekNumber: z.number().int().optional(), notes: z.string().optional() });
   const parsed = schema.safeParse(req.body);
@@ -181,7 +182,7 @@ router.patch("/workout-plans/:planId", async (req: Request, res: Response) => {
 // Workout days
 router.post("/workout-plans/:planId/days", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const planId = parseInt(req.params.planId);
+  const planId = parseInt(String(req.params.planId));
   if (isNaN(planId)) { res.status(400).json({ error: "Invalid planId" }); return; }
   const schema = z.object({
     dayOfWeek: z.string(),
@@ -198,7 +199,7 @@ router.post("/workout-plans/:planId/days", async (req: Request, res: Response) =
 
 router.patch("/workout-days/:dayId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const dayId = parseInt(req.params.dayId);
+  const dayId = parseInt(String(req.params.dayId));
   if (isNaN(dayId)) { res.status(400).json({ error: "Invalid dayId" }); return; }
   const schema = z.object({
     dayOfWeek: z.string().optional(),
@@ -215,7 +216,7 @@ router.patch("/workout-days/:dayId", async (req: Request, res: Response) => {
 
 router.delete("/workout-days/:dayId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const dayId = parseInt(req.params.dayId);
+  const dayId = parseInt(String(req.params.dayId));
   if (isNaN(dayId)) { res.status(400).json({ error: "Invalid dayId" }); return; }
   await db.delete(workoutDaysTable).where(eq(workoutDaysTable.id, dayId));
   res.status(204).end();
@@ -224,7 +225,7 @@ router.delete("/workout-days/:dayId", async (req: Request, res: Response) => {
 // Exercises
 router.post("/workout-days/:dayId/exercises", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const dayId = parseInt(req.params.dayId);
+  const dayId = parseInt(String(req.params.dayId));
   if (isNaN(dayId)) { res.status(400).json({ error: "Invalid dayId" }); return; }
   const schema = z.object({
     name: z.string(),
@@ -243,7 +244,7 @@ router.post("/workout-days/:dayId/exercises", async (req: Request, res: Response
 
 router.patch("/exercises/:exerciseId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const exerciseId = parseInt(req.params.exerciseId);
+  const exerciseId = parseInt(String(req.params.exerciseId));
   if (isNaN(exerciseId)) { res.status(400).json({ error: "Invalid exerciseId" }); return; }
   const schema = z.object({
     name: z.string().optional(),
@@ -262,7 +263,7 @@ router.patch("/exercises/:exerciseId", async (req: Request, res: Response) => {
 
 router.delete("/exercises/:exerciseId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const exerciseId = parseInt(req.params.exerciseId);
+  const exerciseId = parseInt(String(req.params.exerciseId));
   if (isNaN(exerciseId)) { res.status(400).json({ error: "Invalid exerciseId" }); return; }
   await db.delete(exercisesTable).where(eq(exercisesTable.id, exerciseId));
   res.status(204).end();
@@ -271,7 +272,7 @@ router.delete("/exercises/:exerciseId", async (req: Request, res: Response) => {
 // Workout Logs
 router.get("/engagements/:engagementId/workout-logs", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -281,7 +282,7 @@ router.get("/engagements/:engagementId/workout-logs", async (req: Request, res: 
 
 router.post("/engagements/:engagementId/workout-logs", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -296,7 +297,7 @@ router.post("/engagements/:engagementId/workout-logs", async (req: Request, res:
 
 router.get("/engagements/:engagementId/meal-plans", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -306,7 +307,7 @@ router.get("/engagements/:engagementId/meal-plans", async (req: Request, res: Re
 
 router.post("/engagements/:engagementId/meal-plans", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -326,7 +327,7 @@ router.post("/engagements/:engagementId/meal-plans", async (req: Request, res: R
 
 router.get("/meal-plans/:planId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const planId = parseInt(req.params.planId);
+  const planId = parseInt(String(req.params.planId));
   if (isNaN(planId)) { res.status(400).json({ error: "Invalid planId" }); return; }
   const [plan] = await db.select().from(mealPlansTable).where(eq(mealPlansTable.id, planId));
   if (!plan) { res.status(404).json({ error: "Not found" }); return; }
@@ -336,7 +337,7 @@ router.get("/meal-plans/:planId", async (req: Request, res: Response) => {
 
 router.patch("/meal-plans/:planId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const planId = parseInt(req.params.planId);
+  const planId = parseInt(String(req.params.planId));
   if (isNaN(planId)) { res.status(400).json({ error: "Invalid planId" }); return; }
   const schema = z.object({
     weekNumber: z.number().int().optional(),
@@ -355,7 +356,7 @@ router.patch("/meal-plans/:planId", async (req: Request, res: Response) => {
 // Meals
 router.post("/meal-plans/:planId/meals", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const planId = parseInt(req.params.planId);
+  const planId = parseInt(String(req.params.planId));
   if (isNaN(planId)) { res.status(400).json({ error: "Invalid planId" }); return; }
   const schema = z.object({
     dayOfWeek: z.string(),
@@ -372,7 +373,7 @@ router.post("/meal-plans/:planId/meals", async (req: Request, res: Response) => 
 
 router.patch("/meals/:mealId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const mealId = parseInt(req.params.mealId);
+  const mealId = parseInt(String(req.params.mealId));
   if (isNaN(mealId)) { res.status(400).json({ error: "Invalid mealId" }); return; }
   const schema = z.object({
     dayOfWeek: z.string().optional(),
@@ -389,7 +390,7 @@ router.patch("/meals/:mealId", async (req: Request, res: Response) => {
 
 router.delete("/meals/:mealId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const mealId = parseInt(req.params.mealId);
+  const mealId = parseInt(String(req.params.mealId));
   if (isNaN(mealId)) { res.status(400).json({ error: "Invalid mealId" }); return; }
   await db.delete(mealsTable).where(eq(mealsTable.id, mealId));
   res.status(204).end();
@@ -398,7 +399,7 @@ router.delete("/meals/:mealId", async (req: Request, res: Response) => {
 // Meal Logs
 router.get("/engagements/:engagementId/meal-logs", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -408,7 +409,7 @@ router.get("/engagements/:engagementId/meal-logs", async (req: Request, res: Res
 
 router.post("/engagements/:engagementId/meal-logs", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -423,7 +424,7 @@ router.post("/engagements/:engagementId/meal-logs", async (req: Request, res: Re
 
 router.get("/engagements/:engagementId/progress", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -433,7 +434,7 @@ router.get("/engagements/:engagementId/progress", async (req: Request, res: Resp
 
 router.post("/engagements/:engagementId/progress", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -455,7 +456,7 @@ router.post("/engagements/:engagementId/progress", async (req: Request, res: Res
 
 router.patch("/progress/:entryId/annotate", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const entryId = parseInt(req.params.entryId);
+  const entryId = parseInt(String(req.params.entryId));
   if (isNaN(entryId)) { res.status(400).json({ error: "Invalid entryId" }); return; }
   const schema = z.object({ professionalNote: z.string() });
   const parsed = schema.safeParse(req.body);
@@ -468,7 +469,7 @@ router.patch("/progress/:entryId/annotate", async (req: Request, res: Response) 
 
 router.get("/engagements/:engagementId/check-ins", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -478,7 +479,7 @@ router.get("/engagements/:engagementId/check-ins", async (req: Request, res: Res
 
 router.post("/engagements/:engagementId/check-ins", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -497,7 +498,7 @@ router.post("/engagements/:engagementId/check-ins", async (req: Request, res: Re
 
 router.get("/check-ins/:checkInId", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const checkInId = parseInt(req.params.checkInId);
+  const checkInId = parseInt(String(req.params.checkInId));
   if (isNaN(checkInId)) { res.status(400).json({ error: "Invalid checkInId" }); return; }
   const [checkIn] = await db.select().from(checkInsTable).where(eq(checkInsTable.id, checkInId));
   if (!checkIn) { res.status(404).json({ error: "Not found" }); return; }
@@ -506,7 +507,7 @@ router.get("/check-ins/:checkInId", async (req: Request, res: Response) => {
 
 router.patch("/check-ins/:checkInId/respond", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const checkInId = parseInt(req.params.checkInId);
+  const checkInId = parseInt(String(req.params.checkInId));
   if (isNaN(checkInId)) { res.status(400).json({ error: "Invalid checkInId" }); return; }
   const schema = z.object({ professionalFeedback: z.string() });
   const parsed = schema.safeParse(req.body);
@@ -519,7 +520,7 @@ router.patch("/check-ins/:checkInId/respond", async (req: Request, res: Response
 
 router.get("/engagements/:engagementId/messages", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;
@@ -530,7 +531,7 @@ router.get("/engagements/:engagementId/messages", async (req: Request, res: Resp
 
 router.post("/engagements/:engagementId/messages", async (req: Request, res: Response) => {
   if (!requireAuth(req, res)) return;
-  const id = parseInt(req.params.engagementId);
+  const id = parseInt(String(req.params.engagementId));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const eng = await getEngagementOrFail(id, req.user!.id, res);
   if (!eng) return;

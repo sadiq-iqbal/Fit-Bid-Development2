@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
-import type { AuthUser } from "@workspace/api-client-react";
-
-export type { AuthUser };
+export interface AuthUser {
+  id: string;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  profileImageUrl?: string | null;
+  role?: string | null;
+  onboardingCompleted?: boolean;
+}
 
 interface AuthState {
   user: AuthUser | null;
@@ -42,7 +48,7 @@ export function useAuth(): AuthState {
   }, []);
 
   const login = useCallback(() => {
-    const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "/";
+    const base = (typeof import.meta !== "undefined" && (import.meta as unknown as Record<string, Record<string, string>>).env?.BASE_URL?.replace(/\/+$/, "")) || "/";
     window.location.href = `/api/login?returnTo=${encodeURIComponent(base)}`;
   }, []);
 

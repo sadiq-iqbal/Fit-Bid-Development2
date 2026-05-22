@@ -7,7 +7,7 @@ const router: IRouter = Router();
 
 // GET /api/posts/:postId/bids
 router.get("/posts/:postId/bids", async (req: Request, res: Response) => {
-  const postId = parseInt(req.params.postId);
+  const postId = parseInt(String(req.params.postId));
   if (isNaN(postId)) {
     res.status(400).json({ error: "Invalid postId" });
     return;
@@ -26,7 +26,7 @@ router.post("/posts/:postId/bids", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const postId = parseInt(req.params.postId);
+  const postId = parseInt(String(req.params.postId));
   if (isNaN(postId)) {
     res.status(400).json({ error: "Invalid postId" });
     return;
@@ -65,7 +65,7 @@ router.get("/bids/mine", async (req: Request, res: Response) => {
 
 // GET /api/bids/:bidId
 router.get("/bids/:bidId", async (req: Request, res: Response) => {
-  const bidId = parseInt(req.params.bidId);
+  const bidId = parseInt(String(req.params.bidId));
   if (isNaN(bidId)) {
     res.status(400).json({ error: "Invalid bidId" });
     return;
@@ -84,7 +84,7 @@ router.patch("/bids/:bidId/status", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const bidId = parseInt(req.params.bidId);
+  const bidId = parseInt(String(req.params.bidId));
   if (isNaN(bidId)) {
     res.status(400).json({ error: "Invalid bidId" });
     return;

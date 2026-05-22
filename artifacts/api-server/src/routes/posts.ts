@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, postsTable, usersTable, bidsTable } from "@workspace/db";
 import { eq, and, sql, count, desc } from "drizzle-orm";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const router: IRouter = Router();
 
@@ -75,7 +75,7 @@ router.get("/posts/mine", async (req: Request, res: Response) => {
 
 // GET /api/posts/:postId
 router.get("/posts/:postId", async (req: Request, res: Response) => {
-  const id = parseInt(req.params.postId);
+  const id = parseInt(String(req.params.postId));
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -94,7 +94,7 @@ router.patch("/posts/:postId", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const id = parseInt(req.params.postId);
+  const id = parseInt(String(req.params.postId));
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -134,7 +134,7 @@ router.delete("/posts/:postId", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const id = parseInt(req.params.postId);
+  const id = parseInt(String(req.params.postId));
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;

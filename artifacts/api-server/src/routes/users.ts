@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, clientProfilesTable, professionalProfilesTable } from "@workspace/db";
 import { eq, sql, desc, asc, ilike, and } from "drizzle-orm";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const router: IRouter = Router();
 
@@ -51,7 +51,7 @@ router.get("/users/:userId", async (req: Request, res: Response) => {
   const [user] = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.id, req.params.userId));
+    .where(eq(usersTable.id, String(req.params.userId)));
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
@@ -233,7 +233,7 @@ router.get("/professionals/:userId/profile", async (req: Request, res: Response)
     .select({ user: usersTable, profile: professionalProfilesTable })
     .from(usersTable)
     .leftJoin(professionalProfilesTable, eq(usersTable.id, professionalProfilesTable.userId))
-    .where(eq(usersTable.id, req.params.userId));
+    .where(eq(usersTable.id, String(req.params.userId)));
   if (!row) {
     res.status(404).json({ error: "Not found" });
     return;
