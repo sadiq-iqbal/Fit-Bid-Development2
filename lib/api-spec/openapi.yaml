@@ -1,15 +1,40 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: FitBid API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: Auth
+    description: Browser and mobile authentication endpoints.
+  - name: users
+    description: User and profile operations
+  - name: posts
+    description: Client post operations
+  - name: bids
+    description: Bid operations
+  - name: engagements
+    description: Engagement and dashboard operations
+  - name: workouts
+    description: Workout plan operations
+  - name: meals
+    description: Meal plan operations
+  - name: progress
+    description: Progress tracking
+  - name: checkins
+    description: Check-in operations
+  - name: messages
+    description: Messaging
+  - name: reviews
+    description: Review operations
+  - name: notifications
+    description: Notification operations
+  - name: admin
+    description: Admin operations
 paths:
   /healthz:
     get:
@@ -24,7 +49,1525 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect to the returnTo path on success or /api/login on failure.
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to the OIDC provider logout URL.
+  /mobile-auth/token-exchange:
+    post:
+      tags: [Auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Token did not contain usable claims.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Token exchange failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /mobile-auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+
+  # ─── USERS ────────────────────────────────────────────────────────────────
+  /users/me:
+    get:
+      tags: [users]
+      operationId: getMyUser
+      summary: Get current user with profile
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithProfile'
+        '401':
+          description: Unauthorized
+    patch:
+      tags: [users]
+      operationId: updateMyUser
+      summary: Update current user info
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithProfile'
+
+  /users/{userId}:
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: Get public user profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithProfile'
+        '404':
+          description: Not found
+
+  /users/me/complete-onboarding:
+    post:
+      tags: [users]
+      operationId: completeOnboarding
+      summary: Complete onboarding and set role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingInput'
+      responses:
+        '200':
+          description: Onboarding completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithProfile'
+
+  # ─── CLIENT PROFILES ───────────────────────────────────────────────────────
+  /client-profiles/me:
+    get:
+      tags: [users]
+      operationId: getMyClientProfile
+      summary: Get my client profile
+      responses:
+        '200':
+          description: Client profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientProfile'
+    put:
+      tags: [users]
+      operationId: upsertClientProfile
+      summary: Create or update client profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientProfileInput'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientProfile'
+
+  # ─── PROFESSIONAL PROFILES ─────────────────────────────────────────────────
+  /professional-profiles:
+    get:
+      tags: [users]
+      operationId: listProfessionals
+      summary: Browse professional directory
+      parameters:
+        - name: specialty
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [trainer, nutritionist]
+        - name: minRating
+          in: query
+          schema:
+            type: number
+        - name: maxRate
+          in: query
+          schema:
+            type: number
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of professionals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfessionalListResponse'
+
+  /professional-profiles/featured:
+    get:
+      tags: [users]
+      operationId: getFeaturedProfessionals
+      summary: Get featured professionals for landing page
+      responses:
+        '200':
+          description: Featured professionals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProfessionalProfile'
+
+  /professional-profiles/me:
+    get:
+      tags: [users]
+      operationId: getMyProfessionalProfile
+      summary: Get my professional profile
+      responses:
+        '200':
+          description: Professional profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfessionalProfile'
+    put:
+      tags: [users]
+      operationId: upsertProfessionalProfile
+      summary: Create or update professional profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfessionalProfileInput'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfessionalProfile'
+
+  /professional-profiles/{userId}:
+    get:
+      tags: [users]
+      operationId: getProfessionalProfile
+      summary: Get a professional's public profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Professional profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfessionalProfile'
+        '404':
+          description: Not found
+
+  # ─── POSTS ────────────────────────────────────────────────────────────────
+  /posts:
+    get:
+      tags: [posts]
+      operationId: listPosts
+      summary: Browse open client posts
+      parameters:
+        - name: tags
+          in: query
+          schema:
+            type: string
+        - name: budgetMin
+          in: query
+          schema:
+            type: number
+        - name: budgetMax
+          in: query
+          schema:
+            type: number
+        - name: needsTrainer
+          in: query
+          schema:
+            type: boolean
+        - name: needsNutritionist
+          in: query
+          schema:
+            type: boolean
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, in_progress, completed, closed]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostListResponse'
+    post:
+      tags: [posts]
+      operationId: createPost
+      summary: Create a new client post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+      responses:
+        '201':
+          description: Created post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+
+  /posts/mine:
+    get:
+      tags: [posts]
+      operationId: getMyPosts
+      summary: Get my posts (client view)
+      responses:
+        '200':
+          description: My posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+  /posts/{postId}:
+    get:
+      tags: [posts]
+      operationId: getPost
+      summary: Get post details with bids
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Post detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostDetail'
+        '404':
+          description: Not found
+    patch:
+      tags: [posts]
+      operationId: updatePost
+      summary: Update a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostUpdate'
+      responses:
+        '200':
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+    delete:
+      tags: [posts]
+      operationId: deletePost
+      summary: Close/delete a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Deleted
+
+  # ─── BIDS ─────────────────────────────────────────────────────────────────
+  /posts/{postId}/bids:
+    get:
+      tags: [bids]
+      operationId: listBids
+      summary: Get bids for a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of bids
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BidWithProfessional'
+    post:
+      tags: [bids]
+      operationId: createBid
+      summary: Submit a bid on a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BidInput'
+      responses:
+        '201':
+          description: Bid submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+
+  /bids/mine:
+    get:
+      tags: [bids]
+      operationId: getMyBids
+      summary: Get my submitted bids (professional view)
+      responses:
+        '200':
+          description: My bids
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BidWithPost'
+
+  /bids/{bidId}:
+    get:
+      tags: [bids]
+      operationId: getBid
+      summary: Get bid details
+      parameters:
+        - name: bidId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Bid detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidWithProfessional'
+    patch:
+      tags: [bids]
+      operationId: updateBidStatus
+      summary: Accept or reject a bid
+      parameters:
+        - name: bidId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BidStatusUpdate'
+      responses:
+        '200':
+          description: Updated bid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+
+  # ─── ENGAGEMENTS ──────────────────────────────────────────────────────────
+  /engagements:
+    get:
+      tags: [engagements]
+      operationId: listEngagements
+      summary: List engagements for current user
+      responses:
+        '200':
+          description: List of engagements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EngagementSummary'
+
+  /engagements/{engagementId}:
+    get:
+      tags: [engagements]
+      operationId: getEngagement
+      summary: Get engagement details
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Engagement details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngagementDetail'
+        '404':
+          description: Not found
+    patch:
+      tags: [engagements]
+      operationId: updateEngagement
+      summary: Update engagement status
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EngagementUpdate'
+      responses:
+        '200':
+          description: Updated engagement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngagementDetail'
+
+  /engagements/{engagementId}/overview:
+    get:
+      tags: [engagements]
+      operationId: getEngagementOverview
+      summary: Get engagement overview stats
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Engagement overview stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngagementOverview'
+
+  # ─── WORKOUT PLANS ─────────────────────────────────────────────────────────
+  /engagements/{engagementId}/workout-plans:
+    get:
+      tags: [workouts]
+      operationId: listWorkoutPlans
+      summary: List workout plans for engagement
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Workout plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkoutPlan'
+    post:
+      tags: [workouts]
+      operationId: createWorkoutPlan
+      summary: Create a workout plan
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkoutPlanInput'
+      responses:
+        '201':
+          description: Created workout plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutPlan'
+
+  /workout-plans/{planId}:
+    get:
+      tags: [workouts]
+      operationId: getWorkoutPlan
+      summary: Get workout plan with days and exercises
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Workout plan detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutPlanDetail'
+    patch:
+      tags: [workouts]
+      operationId: updateWorkoutPlan
+      summary: Update a workout plan
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkoutPlanUpdate'
+      responses:
+        '200':
+          description: Updated workout plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutPlan'
+
+  /workout-plans/{planId}/days:
+    post:
+      tags: [workouts]
+      operationId: addWorkoutDay
+      summary: Add a workout day to a plan
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkoutDayInput'
+      responses:
+        '201':
+          description: Created workout day
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutDay'
+
+  /workout-days/{dayId}:
+    patch:
+      tags: [workouts]
+      operationId: updateWorkoutDay
+      summary: Update a workout day
+      parameters:
+        - name: dayId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkoutDayUpdate'
+      responses:
+        '200':
+          description: Updated workout day
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutDay'
+    delete:
+      tags: [workouts]
+      operationId: deleteWorkoutDay
+      summary: Delete a workout day
+      parameters:
+        - name: dayId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Deleted
+
+  /workout-days/{dayId}/exercises:
+    post:
+      tags: [workouts]
+      operationId: addExercise
+      summary: Add an exercise to a workout day
+      parameters:
+        - name: dayId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseInput'
+      responses:
+        '201':
+          description: Created exercise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exercise'
+
+  /exercises/{exerciseId}:
+    patch:
+      tags: [workouts]
+      operationId: updateExercise
+      summary: Update an exercise
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseUpdate'
+      responses:
+        '200':
+          description: Updated exercise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exercise'
+    delete:
+      tags: [workouts]
+      operationId: deleteExercise
+      summary: Delete an exercise
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Deleted
+
+  /engagements/{engagementId}/workout-logs:
+    get:
+      tags: [workouts]
+      operationId: listWorkoutLogs
+      summary: Get workout completion logs for engagement
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Workout logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkoutLog'
+    post:
+      tags: [workouts]
+      operationId: logWorkout
+      summary: Log a workout completion
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkoutLogInput'
+      responses:
+        '201':
+          description: Logged workout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutLog'
+
+  # ─── MEAL PLANS ────────────────────────────────────────────────────────────
+  /engagements/{engagementId}/meal-plans:
+    get:
+      tags: [meals]
+      operationId: listMealPlans
+      summary: List meal plans for engagement
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Meal plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealPlan'
+    post:
+      tags: [meals]
+      operationId: createMealPlan
+      summary: Create a meal plan
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealPlanInput'
+      responses:
+        '201':
+          description: Created meal plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealPlan'
+
+  /meal-plans/{planId}:
+    get:
+      tags: [meals]
+      operationId: getMealPlan
+      summary: Get meal plan with meals
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Meal plan detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealPlanDetail'
+    patch:
+      tags: [meals]
+      operationId: updateMealPlan
+      summary: Update a meal plan
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealPlanUpdate'
+      responses:
+        '200':
+          description: Updated meal plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealPlan'
+
+  /meal-plans/{planId}/meals:
+    post:
+      tags: [meals]
+      operationId: addMeal
+      summary: Add a meal to a meal plan
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealInput'
+      responses:
+        '201':
+          description: Created meal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+
+  /meals/{mealId}:
+    patch:
+      tags: [meals]
+      operationId: updateMeal
+      summary: Update a meal
+      parameters:
+        - name: mealId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealUpdate'
+      responses:
+        '200':
+          description: Updated meal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+    delete:
+      tags: [meals]
+      operationId: deleteMeal
+      summary: Delete a meal
+      parameters:
+        - name: mealId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Deleted
+
+  /engagements/{engagementId}/meal-logs:
+    get:
+      tags: [meals]
+      operationId: listMealLogs
+      summary: Get meal compliance logs
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Meal logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealLog'
+    post:
+      tags: [meals]
+      operationId: logMeal
+      summary: Log meal compliance
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealLogInput'
+      responses:
+        '201':
+          description: Logged meal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealLog'
+
+  # ─── PROGRESS ─────────────────────────────────────────────────────────────
+  /engagements/{engagementId}/progress:
+    get:
+      tags: [progress]
+      operationId: listProgressEntries
+      summary: Get progress entries for engagement
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Progress entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgressEntry'
+    post:
+      tags: [progress]
+      operationId: createProgressEntry
+      summary: Log a progress entry
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgressEntryInput'
+      responses:
+        '201':
+          description: Created progress entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressEntry'
+
+  /progress/{entryId}/annotate:
+    post:
+      tags: [progress]
+      operationId: annotateProgress
+      summary: Add professional annotation to a progress entry
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgressAnnotation'
+      responses:
+        '200':
+          description: Annotated entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressEntry'
+
+  # ─── CHECK-INS ────────────────────────────────────────────────────────────
+  /engagements/{engagementId}/check-ins:
+    get:
+      tags: [checkins]
+      operationId: listCheckIns
+      summary: List check-ins for engagement
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Check-ins
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CheckIn'
+    post:
+      tags: [checkins]
+      operationId: submitCheckIn
+      summary: Submit a weekly check-in
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckInInput'
+      responses:
+        '201':
+          description: Check-in submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+
+  /check-ins/{checkInId}:
+    get:
+      tags: [checkins]
+      operationId: getCheckIn
+      summary: Get a check-in
+      parameters:
+        - name: checkInId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Check-in detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+    patch:
+      tags: [checkins]
+      operationId: respondToCheckIn
+      summary: Professional responds to a check-in
+      parameters:
+        - name: checkInId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckInFeedback'
+      responses:
+        '200':
+          description: Updated check-in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+
+  # ─── MESSAGES ─────────────────────────────────────────────────────────────
+  /engagements/{engagementId}/messages:
+    get:
+      tags: [messages]
+      operationId: getEngagementMessages
+      summary: Get messages for engagement
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: before
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+    post:
+      tags: [messages]
+      operationId: sendMessage
+      summary: Send a message in an engagement
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageInput'
+      responses:
+        '201':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+  # ─── REVIEWS ──────────────────────────────────────────────────────────────
+  /professional-profiles/{userId}/reviews:
+    get:
+      tags: [reviews]
+      operationId: listReviews
+      summary: Get reviews for a professional
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Review'
+
+  /reviews:
+    post:
+      tags: [reviews]
+      operationId: createReview
+      summary: Submit a review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+      responses:
+        '201':
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+
+  /reviews/{reviewId}/reply:
+    patch:
+      tags: [reviews]
+      operationId: replyToReview
+      summary: Professional replies to a review
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewReply'
+      responses:
+        '200':
+          description: Updated review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+
+  # ─── NOTIFICATIONS ────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: Get my notifications
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+
+  /notifications/read-all:
+    patch:
+      tags: [notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark all notifications as read
+      responses:
+        '200':
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /notifications/{notificationId}/read:
+    patch:
+      tags: [notifications]
+      operationId: markNotificationRead
+      summary: Mark a notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+
+  # ─── DASHBOARD ────────────────────────────────────────────────────────────
+  /dashboard:
+    get:
+      tags: [engagements]
+      operationId: getDashboard
+      summary: Role-aware dashboard summary
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+
+  # ─── ADMIN ────────────────────────────────────────────────────────────────
+  /admin/professionals/pending:
+    get:
+      tags: [admin]
+      operationId: listPendingVerifications
+      summary: List pending professional verifications
+      responses:
+        '200':
+          description: Pending professionals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProfessionalProfile'
+
+  /admin/professionals/{userId}/verify:
+    patch:
+      tags: [admin]
+      operationId: verifyProfessional
+      summary: Approve or reject professional verification
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationDecision'
+      responses:
+        '200':
+          description: Updated professional
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfessionalProfile'
+
+  /admin/stats:
+    get:
+      tags: [admin]
+      operationId: getAdminStats
+      summary: Get platform-wide statistics
+      responses:
+        '200':
+          description: Admin stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStats'
+
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — Bearer <sid>.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +1577,1314 @@ components:
       required:
         - status
 
+    # ─── Auth ──────────────────────────────────────────────────────────────
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+          format: email
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+          format: uri
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    # ─── Users ─────────────────────────────────────────────────────────────
+    User:
+      type: object
+      required: [id, email, role, name, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+        role:
+          type: [string, 'null']
+          enum: [client, trainer, nutritionist, admin, null]
+        name:
+          type: [string, 'null']
+        avatarUrl:
+          type: [string, 'null']
+        onboardingCompleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    UserWithProfile:
+      type: object
+      required: [id, email, role, name, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+        role:
+          type: [string, 'null']
+          enum: [client, trainer, nutritionist, admin, null]
+        name:
+          type: [string, 'null']
+        avatarUrl:
+          type: [string, 'null']
+        onboardingCompleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        clientProfile:
+          oneOf:
+            - $ref: '#/components/schemas/ClientProfile'
+            - type: 'null'
+        professionalProfile:
+          oneOf:
+            - $ref: '#/components/schemas/ProfessionalProfile'
+            - type: 'null'
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        avatarUrl:
+          type: string
+
+    OnboardingInput:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [client, trainer, nutritionist]
+        clientProfile:
+          $ref: '#/components/schemas/ClientProfileInput'
+        professionalProfile:
+          $ref: '#/components/schemas/ProfessionalProfileInput'
+
+    # ─── Client Profile ────────────────────────────────────────────────────
+    ClientProfile:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+        age:
+          type: [integer, 'null']
+        gender:
+          type: [string, 'null']
+        heightCm:
+          type: [number, 'null']
+        weightKg:
+          type: [number, 'null']
+        bmi:
+          type: [number, 'null']
+        healthConditions:
+          type: array
+          items:
+            type: string
+        fitnessGoals:
+          type: array
+          items:
+            type: string
+        activityLevel:
+          type: [string, 'null']
+          enum: [sedentary, lightly_active, moderately_active, very_active, null]
+        budgetMin:
+          type: [number, 'null']
+        budgetMax:
+          type: [number, 'null']
+        preferredDurationWeeks:
+          type: [integer, 'null']
+
+    ClientProfileInput:
+      type: object
+      properties:
+        age:
+          type: integer
+        gender:
+          type: string
+        heightCm:
+          type: number
+        weightKg:
+          type: number
+        healthConditions:
+          type: array
+          items:
+            type: string
+        fitnessGoals:
+          type: array
+          items:
+            type: string
+        activityLevel:
+          type: string
+          enum: [sedentary, lightly_active, moderately_active, very_active]
+        budgetMin:
+          type: number
+        budgetMax:
+          type: number
+        preferredDurationWeeks:
+          type: integer
+
+    # ─── Professional Profile ──────────────────────────────────────────────
+    ProfessionalProfile:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+        name:
+          type: [string, 'null']
+        avatarUrl:
+          type: [string, 'null']
+        specialty:
+          type: [string, 'null']
+        bio:
+          type: [string, 'null']
+        yearsExperience:
+          type: [integer, 'null']
+        certifications:
+          type: array
+          items:
+            type: string
+        verificationStatus:
+          type: string
+          enum: [pending, approved, rejected]
+        avgRating:
+          type: [number, 'null']
+        totalEngagements:
+          type: integer
+        hourlyRate:
+          type: [number, 'null']
+        availabilityStatus:
+          type: string
+          enum: [open, booked]
+        role:
+          type: [string, 'null']
+          enum: [trainer, nutritionist, null]
+
+    ProfessionalProfileInput:
+      type: object
+      properties:
+        specialty:
+          type: string
+        bio:
+          type: string
+        yearsExperience:
+          type: integer
+        certifications:
+          type: array
+          items:
+            type: string
+        hourlyRate:
+          type: number
+        availabilityStatus:
+          type: string
+          enum: [open, booked]
+
+    ProfessionalListResponse:
+      type: object
+      required: [professionals, total]
+      properties:
+        professionals:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfessionalProfile'
+        total:
+          type: integer
+
+    VerificationDecision:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        reason:
+          type: string
+
+    # ─── Posts ─────────────────────────────────────────────────────────────
+    Post:
+      type: object
+      required: [id, clientId, title, status, createdAt]
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: string
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        tags:
+          type: array
+          items:
+            type: string
+        needsTrainer:
+          type: boolean
+        needsNutritionist:
+          type: boolean
+        budgetMin:
+          type: [number, 'null']
+        budgetMax:
+          type: [number, 'null']
+        durationWeeks:
+          type: [integer, 'null']
+        status:
+          type: string
+          enum: [open, in_progress, completed, closed]
+        visibility:
+          type: string
+          enum: [public, invite_only]
+        bidCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    PostDetail:
+      type: object
+      required: [id, clientId, title, status, createdAt]
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: string
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        tags:
+          type: array
+          items:
+            type: string
+        needsTrainer:
+          type: boolean
+        needsNutritionist:
+          type: boolean
+        budgetMin:
+          type: [number, 'null']
+        budgetMax:
+          type: [number, 'null']
+        durationWeeks:
+          type: [integer, 'null']
+        status:
+          type: string
+          enum: [open, in_progress, completed, closed]
+        visibility:
+          type: string
+          enum: [public, invite_only]
+        bidCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        client:
+          $ref: '#/components/schemas/User'
+        bids:
+          type: array
+          items:
+            $ref: '#/components/schemas/BidWithProfessional'
+
+    PostInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        needsTrainer:
+          type: boolean
+        needsNutritionist:
+          type: boolean
+        budgetMin:
+          type: number
+        budgetMax:
+          type: number
+        durationWeeks:
+          type: integer
+        visibility:
+          type: string
+          enum: [public, invite_only]
+
+    PostUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [open, in_progress, completed, closed]
+        budgetMin:
+          type: number
+        budgetMax:
+          type: number
+        durationWeeks:
+          type: integer
+
+    PostListResponse:
+      type: object
+      required: [posts, total]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        total:
+          type: integer
+
+    # ─── Bids ──────────────────────────────────────────────────────────────
+    Bid:
+      type: object
+      required: [id, postId, professionalId, status, createdAt]
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        professionalId:
+          type: string
+        proposalText:
+          type: [string, 'null']
+        price:
+          type: [number, 'null']
+        estimatedWeeks:
+          type: [integer, 'null']
+        introOffer:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+        createdAt:
+          type: string
+          format: date-time
+
+    BidWithProfessional:
+      type: object
+      required: [id, postId, professionalId, status, createdAt]
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        professionalId:
+          type: string
+        proposalText:
+          type: [string, 'null']
+        price:
+          type: [number, 'null']
+        estimatedWeeks:
+          type: [integer, 'null']
+        introOffer:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+        createdAt:
+          type: string
+          format: date-time
+        professional:
+          $ref: '#/components/schemas/ProfessionalProfile'
+
+    BidWithPost:
+      type: object
+      required: [id, postId, professionalId, status, createdAt]
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        professionalId:
+          type: string
+        proposalText:
+          type: [string, 'null']
+        price:
+          type: [number, 'null']
+        estimatedWeeks:
+          type: [integer, 'null']
+        introOffer:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+        createdAt:
+          type: string
+          format: date-time
+        post:
+          $ref: '#/components/schemas/Post'
+
+    BidInput:
+      type: object
+      required: [proposalText, price]
+      properties:
+        proposalText:
+          type: string
+          minLength: 1
+        price:
+          type: number
+        estimatedWeeks:
+          type: integer
+        introOffer:
+          type: string
+
+    BidStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted, rejected]
+
+    # ─── Engagements ───────────────────────────────────────────────────────
+    EngagementSummary:
+      type: object
+      required: [id, postId, clientId, status, startDate]
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        clientId:
+          type: string
+        trainerId:
+          type: [string, 'null']
+        nutritionistId:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [active, paused, completed, disputed]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: [string, 'null']
+          format: date-time
+        totalAmount:
+          type: [number, 'null']
+        postTitle:
+          type: [string, 'null']
+        clientName:
+          type: [string, 'null']
+        clientAvatarUrl:
+          type: [string, 'null']
+
+    EngagementDetail:
+      type: object
+      required: [id, postId, clientId, status, startDate]
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        clientId:
+          type: string
+        trainerId:
+          type: [string, 'null']
+        nutritionistId:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [active, paused, completed, disputed]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: [string, 'null']
+          format: date-time
+        totalAmount:
+          type: [number, 'null']
+        escrowStatus:
+          type: [string, 'null']
+          enum: [held, released, refunded, null]
+        client:
+          $ref: '#/components/schemas/User'
+        trainer:
+          oneOf:
+            - $ref: '#/components/schemas/UserWithProfile'
+            - type: 'null'
+        nutritionist:
+          oneOf:
+            - $ref: '#/components/schemas/UserWithProfile'
+            - type: 'null'
+        post:
+          $ref: '#/components/schemas/Post'
+        clientProfile:
+          oneOf:
+            - $ref: '#/components/schemas/ClientProfile'
+            - type: 'null'
+
+    EngagementUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, paused, completed, disputed]
+        endDate:
+          type: string
+          format: date-time
+
+    EngagementOverview:
+      type: object
+      required: [engagementId]
+      properties:
+        engagementId:
+          type: integer
+        workoutsCompletedThisWeek:
+          type: integer
+        totalWorkoutsThisWeek:
+          type: integer
+        mealsLoggedThisWeek:
+          type: integer
+        totalMealsThisWeek:
+          type: integer
+        latestWeight:
+          type: [number, 'null']
+        weeksSinceStart:
+          type: integer
+        progressPhotoCount:
+          type: integer
+        lastCheckInDate:
+          type: [string, 'null']
+          format: date-time
+
+    # ─── Workout Plans ─────────────────────────────────────────────────────
+    WorkoutPlan:
+      type: object
+      required: [id, engagementId, trainerId, weekNumber, createdAt]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        trainerId:
+          type: string
+        weekNumber:
+          type: integer
+        notes:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+
+    WorkoutPlanDetail:
+      type: object
+      required: [id, engagementId, trainerId, weekNumber, createdAt]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        trainerId:
+          type: string
+        weekNumber:
+          type: integer
+        notes:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkoutDayWithExercises'
+
+    WorkoutPlanInput:
+      type: object
+      required: [weekNumber]
+      properties:
+        weekNumber:
+          type: integer
+        notes:
+          type: string
+
+    WorkoutPlanUpdate:
+      type: object
+      properties:
+        weekNumber:
+          type: integer
+        notes:
+          type: string
+
+    WorkoutDay:
+      type: object
+      required: [id, planId, dayOfWeek]
+      properties:
+        id:
+          type: integer
+        planId:
+          type: integer
+        dayOfWeek:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        focusArea:
+          type: [string, 'null']
+        durationMinutes:
+          type: [integer, 'null']
+        notes:
+          type: [string, 'null']
+        isRestDay:
+          type: boolean
+
+    WorkoutDayWithExercises:
+      type: object
+      required: [id, planId, dayOfWeek]
+      properties:
+        id:
+          type: integer
+        planId:
+          type: integer
+        dayOfWeek:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        focusArea:
+          type: [string, 'null']
+        durationMinutes:
+          type: [integer, 'null']
+        notes:
+          type: [string, 'null']
+        isRestDay:
+          type: boolean
+        exercises:
+          type: array
+          items:
+            $ref: '#/components/schemas/Exercise'
+
+    WorkoutDayInput:
+      type: object
+      required: [dayOfWeek]
+      properties:
+        dayOfWeek:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        focusArea:
+          type: string
+        durationMinutes:
+          type: integer
+        notes:
+          type: string
+        isRestDay:
+          type: boolean
+
+    WorkoutDayUpdate:
+      type: object
+      properties:
+        focusArea:
+          type: string
+        durationMinutes:
+          type: integer
+        notes:
+          type: string
+        isRestDay:
+          type: boolean
+
+    Exercise:
+      type: object
+      required: [id, dayId, name]
+      properties:
+        id:
+          type: integer
+        dayId:
+          type: integer
+        name:
+          type: string
+        sets:
+          type: [integer, 'null']
+        reps:
+          type: [integer, 'null']
+        restSeconds:
+          type: [integer, 'null']
+        videoUrl:
+          type: [string, 'null']
+        notes:
+          type: [string, 'null']
+        orderIndex:
+          type: integer
+
+    ExerciseInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        sets:
+          type: integer
+        reps:
+          type: integer
+        restSeconds:
+          type: integer
+        videoUrl:
+          type: string
+        notes:
+          type: string
+        orderIndex:
+          type: integer
+
+    ExerciseUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        sets:
+          type: integer
+        reps:
+          type: integer
+        restSeconds:
+          type: integer
+        videoUrl:
+          type: string
+        notes:
+          type: string
+        orderIndex:
+          type: integer
+
+    WorkoutLog:
+      type: object
+      required: [id, engagementId, clientId, dayId, completedAt]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        clientId:
+          type: string
+        dayId:
+          type: integer
+        completedAt:
+          type: string
+          format: date-time
+        notes:
+          type: [string, 'null']
+        rating:
+          type: [integer, 'null']
+
+    WorkoutLogInput:
+      type: object
+      required: [dayId]
+      properties:
+        dayId:
+          type: integer
+        notes:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+
+    # ─── Meal Plans ────────────────────────────────────────────────────────
+    MealPlan:
+      type: object
+      required: [id, engagementId, nutritionistId, weekNumber, createdAt]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        nutritionistId:
+          type: string
+        weekNumber:
+          type: integer
+        dailyCalories:
+          type: [integer, 'null']
+        proteinG:
+          type: [integer, 'null']
+        carbsG:
+          type: [integer, 'null']
+        fatsG:
+          type: [integer, 'null']
+        notes:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+
+    MealPlanDetail:
+      type: object
+      required: [id, engagementId, nutritionistId, weekNumber, createdAt]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        nutritionistId:
+          type: string
+        weekNumber:
+          type: integer
+        dailyCalories:
+          type: [integer, 'null']
+        proteinG:
+          type: [integer, 'null']
+        carbsG:
+          type: [integer, 'null']
+        fatsG:
+          type: [integer, 'null']
+        notes:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+        meals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Meal'
+
+    MealPlanInput:
+      type: object
+      required: [weekNumber]
+      properties:
+        weekNumber:
+          type: integer
+        dailyCalories:
+          type: integer
+        proteinG:
+          type: integer
+        carbsG:
+          type: integer
+        fatsG:
+          type: integer
+        notes:
+          type: string
+
+    MealPlanUpdate:
+      type: object
+      properties:
+        dailyCalories:
+          type: integer
+        proteinG:
+          type: integer
+        carbsG:
+          type: integer
+        fatsG:
+          type: integer
+        notes:
+          type: string
+
+    Meal:
+      type: object
+      required: [id, planId, dayOfWeek, mealType]
+      properties:
+        id:
+          type: integer
+        planId:
+          type: integer
+        dayOfWeek:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        mealType:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        items:
+          type: array
+          items:
+            type: string
+        totalCalories:
+          type: [integer, 'null']
+        notes:
+          type: [string, 'null']
+
+    MealInput:
+      type: object
+      required: [dayOfWeek, mealType]
+      properties:
+        dayOfWeek:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        mealType:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        items:
+          type: array
+          items:
+            type: string
+        totalCalories:
+          type: integer
+        notes:
+          type: string
+
+    MealUpdate:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+        totalCalories:
+          type: integer
+        notes:
+          type: string
+
+    MealLog:
+      type: object
+      required: [id, engagementId, clientId, mealId, loggedAt, compliance]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        clientId:
+          type: string
+        mealId:
+          type: integer
+        loggedAt:
+          type: string
+          format: date-time
+        compliance:
+          type: string
+          enum: [full, partial, skipped]
+        notes:
+          type: [string, 'null']
+
+    MealLogInput:
+      type: object
+      required: [mealId, compliance]
+      properties:
+        mealId:
+          type: integer
+        compliance:
+          type: string
+          enum: [full, partial, skipped]
+        notes:
+          type: string
+
+    # ─── Progress ──────────────────────────────────────────────────────────
+    ProgressEntry:
+      type: object
+      required: [id, engagementId, clientId, loggedAt]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        clientId:
+          type: string
+        loggedAt:
+          type: string
+          format: date-time
+        weightKg:
+          type: [number, 'null']
+        waistCm:
+          type: [number, 'null']
+        chestCm:
+          type: [number, 'null']
+        hipsCm:
+          type: [number, 'null']
+        energyLevel:
+          type: [integer, 'null']
+        sleepQuality:
+          type: [integer, 'null']
+        mood:
+          type: [integer, 'null']
+        notes:
+          type: [string, 'null']
+        professionalNote:
+          type: [string, 'null']
+
+    ProgressEntryInput:
+      type: object
+      properties:
+        weightKg:
+          type: number
+        waistCm:
+          type: number
+        chestCm:
+          type: number
+        hipsCm:
+          type: number
+        energyLevel:
+          type: integer
+          minimum: 1
+          maximum: 5
+        sleepQuality:
+          type: integer
+          minimum: 1
+          maximum: 5
+        mood:
+          type: integer
+          minimum: 1
+          maximum: 5
+        notes:
+          type: string
+
+    ProgressAnnotation:
+      type: object
+      required: [note]
+      properties:
+        note:
+          type: string
+          minLength: 1
+
+    # ─── Check-ins ─────────────────────────────────────────────────────────
+    CheckIn:
+      type: object
+      required: [id, engagementId, clientId, weekNumber]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        clientId:
+          type: string
+        weekNumber:
+          type: integer
+        wentWell:
+          type: [string, 'null']
+        challenges:
+          type: [string, 'null']
+        painDiscomfort:
+          type: [string, 'null']
+        questions:
+          type: [string, 'null']
+        professionalFeedback:
+          type: [string, 'null']
+        submittedAt:
+          type: [string, 'null']
+          format: date-time
+        feedbackAt:
+          type: [string, 'null']
+          format: date-time
+
+    CheckInInput:
+      type: object
+      required: [weekNumber]
+      properties:
+        weekNumber:
+          type: integer
+        wentWell:
+          type: string
+        challenges:
+          type: string
+        painDiscomfort:
+          type: string
+        questions:
+          type: string
+
+    CheckInFeedback:
+      type: object
+      required: [professionalFeedback]
+      properties:
+        professionalFeedback:
+          type: string
+          minLength: 1
+
+    # ─── Messages ──────────────────────────────────────────────────────────
+    Message:
+      type: object
+      required: [id, engagementId, senderId, content, sentAt]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        senderId:
+          type: string
+        content:
+          type: string
+        attachmentUrl:
+          type: [string, 'null']
+        sentAt:
+          type: string
+          format: date-time
+        senderName:
+          type: [string, 'null']
+        senderAvatarUrl:
+          type: [string, 'null']
+
+    MessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+        attachmentUrl:
+          type: string
+
+    # ─── Reviews ───────────────────────────────────────────────────────────
+    Review:
+      type: object
+      required: [id, engagementId, reviewerId, revieweeId, rating, createdAt]
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        reviewerId:
+          type: string
+        revieweeId:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: [string, 'null']
+        professionalReply:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+        reviewerName:
+          type: [string, 'null']
+        reviewerAvatarUrl:
+          type: [string, 'null']
+
+    ReviewInput:
+      type: object
+      required: [engagementId, revieweeId, rating]
+      properties:
+        engagementId:
+          type: integer
+        revieweeId:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+
+    ReviewReply:
+      type: object
+      required: [reply]
+      properties:
+        reply:
+          type: string
+          minLength: 1
+
+    # ─── Notifications ─────────────────────────────────────────────────────
+    Notification:
+      type: object
+      required: [id, userId, type, message, read, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        type:
+          type: string
+        message:
+          type: string
+        link:
+          type: [string, 'null']
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    # ─── Dashboard ─────────────────────────────────────────────────────────
+    DashboardSummary:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+        activeEngagements:
+          type: integer
+        pendingBids:
+          type: integer
+        unreadNotifications:
+          type: integer
+        openPosts:
+          type: integer
+        recentEngagements:
+          type: array
+          items:
+            $ref: '#/components/schemas/EngagementSummary'
+        recentNotifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+
+    # ─── Admin ─────────────────────────────────────────────────────────────
+    AdminStats:
+      type: object
+      required: [totalUsers, totalProfessionals, totalClients, totalPosts, totalEngagements, totalRevenue]
+      properties:
+        totalUsers:
+          type: integer
+        totalProfessionals:
+          type: integer
+        totalClients:
+          type: integer
+        totalPosts:
+          type: integer
+        openPosts:
+          type: integer
+        totalEngagements:
+          type: integer
+        activeEngagements:
+          type: integer
+        totalRevenue:
+          type: number
+        pendingVerifications:
+          type: integer
